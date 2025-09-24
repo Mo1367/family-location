@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>موقعیت همسر</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Tahoma;
+        }
+        #map {
+            height: 100vh;
+            width: 100%;
+        }
+        .info-panel {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(255,255,255,0.95);
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            z-index: 1000;
+            max-width: 320px;
+            backdrop-filter: blur(10px);
+        }
+        .status {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 8px;
+            text-align: center;
+            font-weight: bold;
+        }
+        .online { 
+            background: #d4edda; 
+            color: #155724; 
+            border: 2px solid #c3e6cb;
+        }
+        .offline { 
+            background: #f8d7da; 
+            color: #721c24; 
+            border: 2px solid #f5c6cb;
+        }
+        .location-info {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 10px 0;
+            border-right: 4px solid #667eea;
+        }
+        .instructions {
+            margin-top: 15px;
+            padding: 10px;
+            background: #e9ecef;
+            border-radius: 5px;
+            font-size: 12px;
+            color: #495057;
+        }
+    </style>
+</head>
+<body>
+    <div class="info-panel">
+        <h2 style="margin: 0 0 15px 0; color: #333;">📍 موقعیت همسر</h2>
+        
+        <div class="location-info">
+            <div>📡 وضعیت: <span id="status" class="status offline">در حال اتصال...</span></div>
+            <div>🕒 آخرین بروزرسانی: <span id="time">-</span></div>
+            <div>📍 عرض جغرافیایی: <span id="lat">-</span></div>
+            <div>📍 طول جغرافیایی: <span id="lng">-</span></div>
+        </div>
+
+        <div class="instructions">
+            <strong>💡 راهنما:</strong>
+            <p>موقعیت هر 10 ثانیه به روز می‌شود</p>
+            <p>برای نصب: منو → Add to Home Screen</p>
+        </div>
+    </div>
+    
+    <div id="map"></div>
+
+    <!-- Leaflet Map -->
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <!-- Firebase -->
+    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-database-compat.js"></script>
+
+    <script>
+        // تنظیمات Firebase با مقادیر شما
+        const firebaseConfig = {
+            apiKey: "AIzaSyCYy3J1dmSU5Rg-rwImfLSZiV8_eNdVgEs",
+            authDomain: "family-location-tracker-9f357.firebaseapp.com",
+            databaseURL: "https://family-location-tracker-9f357-default-rtdb.firebaseio.com",
+            projectId: "family-location-tracker-9f357",
+            storageBucket: "family-location-tracker-9f357.firebasestorage.app",
+            messagingSenderId: "627634853656",
+            appId: "1:627634853656:web:c9e91bd17e008de4cbb06d"
+        };
+
+        // Initialize Firebase
+        const app = firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+
+        // تنظیمات نقشه
+        const map = L.map('map').setView([35.6892, 51.3890], 10); // تهران
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors',
+            maxZoom: 18
+        }).addTo(map);
+
+        let marker = null;
+        let circle = null;
+
+        // گوش دادن به تغییرات موقعیت
+        database.ref('wifeLocation/').on('value', (snapshot) => {
+            const data = snapshot.val();
+            const statusElement = document.getElementById('status');
+            const timeElement = document.getElementById('time');
+            const latElement = document.getElementById('lat');
+            const lngElement = document.getElementById('lng');
+
+            if (data && data.latitude) {
+                const lat = data.latitude;
+                const lng = data.longitude;
+                const time = new Date(data.timestamp).toLocaleString('fa-IR');
+                
+                // بروزرسانی اطلاعات
+                latElement.textContent = lat.toFixed(6);
+                lngElement.textContent = lng.toFixed(6);
+                timeElement.textContent = time;
+                
+                statusElement.textContent = 'آنلاین ✅';
+                statusElement.className = 'status online';
+
+                // بروزرسانی نقشه
+                if (marker) {
+                    marker.setLatLng([lat, lng]);
+                } else {
+                    marker = L.marker([lat, lng])
+                        .addTo(map)
+                        .bindPopup(`
+                            <strong>موقعیت همسر</strong><br>
+                            زمان: ${time}<br>
+                            <a href="https://maps.google.com/?q=${lat},${lng}" target="_blank">
+                                باز کردن در Google Maps
+                            </a>
+                        `)
+                        .openPopup();
+                }
+
+                // دایره دقت موقعیت
+                if (circle) {
+                    circle.setLatLng([lat, lng]);
+                } else {
+                    circle = L.circle([lat, lng], {
+                        color: 'red',
+                        fillColor: '#f03',
+                        fillOpacity: 0.2,
+                        radius: 50
+                    }).addTo(map);
+                }
+                
+                map.setView([lat, lng], 15);
+            } else {
+                statusElement.textContent = 'آفلاین ❌';
+                statusElement.className = 'status offline';
+                timeElement.textContent = '-';
+                latElement.textContent = '-';
+                lngElement.textContent = '-';
+            }
+        });
+
+        // بروزرسانی خودکار هر 5 ثانیه (برای نمایش وضعیت)
+        setInterval(() => {
+            database.ref('wifeLocation/').once('value').then((snapshot) => {
+                if (!snapshot.exists()) {
+                    document.getElementById('status').textContent = 'آفلاین ❌';
+                    document.getElementById('status').className = 'status offline';
+                }
+            });
+        }, 5000);
+
+        // Service Worker برای PWA
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/sw-receiver.js');
+        }
+    </script>
+</body>
+</html>
