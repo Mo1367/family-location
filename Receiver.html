@@ -6,89 +6,208 @@
     <title>موقعیت همسر</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
     <style>
-        body {
+        * {
             margin: 0;
             padding: 0;
-            font-family: Tahoma;
+            box-sizing: border-box;
         }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f5f5f5;
+        }
+        
         #map {
             height: 100vh;
             width: 100%;
+            z-index: 1;
         }
+        
+        /* پنل اطلاعات - جمع شونده */
         .info-panel {
             position: absolute;
             top: 10px;
             right: 10px;
-            background: rgba(255,255,255,0.95);
-            padding: 20px;
+            left: 10px;
+            background: rgba(255, 255, 255, 0.95);
             border-radius: 15px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
             z-index: 1000;
-            max-width: 320px;
+            max-width: 400px;
+            margin: 0 auto;
             backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            transition: all 0.3s ease;
         }
-        .status {
+        
+        .panel-header {
+            padding: 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 15px 15px 0 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .panel-content {
+            padding: 15px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        
+        .panel-collapsed {
+            max-height: 60px;
+        }
+        
+        .toggle-btn {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 20px;
+            cursor: pointer;
+            padding: 5px;
+        }
+        
+        /* کارت اطلاعات موقعیت */
+        .location-card {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            padding: 15px;
+            border-radius: 10px;
             margin: 10px 0;
-            padding: 10px;
-            border-radius: 8px;
-            text-align: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .location-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 8px 0;
+            padding: 5px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.2);
+        }
+        
+        .status-badge {
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 12px;
             font-weight: bold;
         }
-        .online { 
-            background: #d4edda; 
-            color: #155724; 
-            border: 2px solid #c3e6cb;
+        
+        .online { background: #4CAF50; }
+        .offline { background: #f44336; }
+        
+        /* دکمه‌های کنترل */
+        .control-buttons {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 10px;
+            z-index: 1000;
         }
-        .offline { 
-            background: #f8d7da; 
-            color: #721c24; 
-            border: 2px solid #f5c6cb;
+        
+        .control-btn {
+            background: rgba(255, 255, 255, 0.95);
+            border: none;
+            padding: 12px 20px;
+            border-radius: 25px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            cursor: pointer;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            transition: all 0.3s;
         }
-        .location-info {
-            background: #f8f9fa;
-            padding: 15px;
-            border-radius: 8px;
-            margin: 10px 0;
-            border-right: 4px solid #667eea;
+        
+        .control-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
         }
-        .instructions {
-            margin-top: 15px;
-            padding: 10px;
-            background: #e9ecef;
-            border-radius: 5px;
-            font-size: 12px;
-            color: #495057;
+        
+        /* نشانگر موقعیت */
+        .custom-marker {
+            background: #ff4757;
+            border: 3px solid white;
+            border-radius: 50%;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+        }
+        
+        /* ریسپانسیو */
+        @media (max-width: 768px) {
+            .info-panel {
+                right: 10px;
+                left: 10px;
+                max-width: none;
+            }
+            
+            .control-buttons {
+                bottom: 10px;
+                flex-direction: column;
+            }
+        }
+        
+        /* انیمیشن */
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+        
+        .pulse {
+            animation: pulse 2s infinite;
         }
     </style>
 </head>
 <body>
-    <div class="info-panel">
-        <h2 style="margin: 0 0 15px 0; color: #333;">📍 موقعیت همسر</h2>
-        
-        <div class="location-info">
-            <div>📡 وضعیت: <span id="status" class="status offline">در حال اتصال...</span></div>
-            <div>🕒 آخرین بروزرسانی: <span id="time">-</span></div>
-            <div>📍 عرض جغرافیایی: <span id="lat">-</span></div>
-            <div>📍 طول جغرافیایی: <span id="lng">-</span></div>
+    <!-- پنل اطلاعات -->
+    <div class="info-panel" id="infoPanel">
+        <div class="panel-header">
+            <h3 style="margin: 0;">📍 موقعیت همسر</h3>
+            <button class="toggle-btn" onclick="togglePanel()">−</button>
         </div>
-
-        <div class="instructions">
-            <strong>💡 راهنما:</strong>
-            <p>موقعیت هر 10 ثانیه به روز می‌شود</p>
-            <p>برای نصب: منو → Add to Home Screen</p>
+        <div class="panel-content" id="panelContent">
+            <div class="location-card">
+                <div class="location-item">
+                    <span>📡 وضعیت:</span>
+                    <span id="status" class="status-badge offline">جستجو...</span>
+                </div>
+                <div class="location-item">
+                    <span>🕒 آخرین بروزرسانی:</span>
+                    <span id="time">-</span>
+                </div>
+                <div class="location-item">
+                    <span>📍 عرض جغرافیایی:</span>
+                    <span id="lat">-</span>
+                </div>
+                <div class="location-item">
+                    <span>📍 طول جغرافیایی:</span>
+                    <span id="lng">-</span>
+                </div>
+            </div>
         </div>
     </div>
     
+    <!-- نقشه -->
     <div id="map"></div>
+    
+    <!-- دکمه‌های کنترل -->
+    <div class="control-buttons">
+        <button class="control-btn" onclick="zoomIn()">🔍 بزرگنمایی</button>
+        <button class="control-btn" onclick="zoomOut()">🔍 کوچکنمایی</button>
+        <button class="control-btn" onclick="centerMap()">🎯 مرکزیت نقشه</button>
+    </div>
 
-    <!-- Leaflet Map -->
+    <!-- کتابخانه‌ها -->
     <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
-    <!-- Firebase -->
     <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-database-compat.js"></script>
 
     <script>
-        // تنظیمات Firebase با مقادیر شما
+        // تنظیمات Firebase
         const firebaseConfig = {
             apiKey: "AIzaSyCYy3J1dmSU5Rg-rwImfLSZiV8_eNdVgEs",
             authDomain: "family-location-tracker-9f357.firebaseapp.com",
@@ -104,7 +223,7 @@
         const database = firebase.database();
 
         // تنظیمات نقشه
-        const map = L.map('map').setView([35.6892, 51.3890], 10); // تهران
+        const map = L.map('map').setView([35.6892, 51.3890], 13);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '© OpenStreetMap contributors',
             maxZoom: 18
@@ -112,6 +231,40 @@
 
         let marker = null;
         let circle = null;
+        let isPanelCollapsed = false;
+
+        // توابع کنترل پنل
+        function togglePanel() {
+            const panel = document.getElementById('infoPanel');
+            const content = document.getElementById('panelContent');
+            const toggleBtn = document.querySelector('.toggle-btn');
+            
+            if (isPanelCollapsed) {
+                content.style.display = 'block';
+                panel.style.maxHeight = 'none';
+                toggleBtn.textContent = '−';
+            } else {
+                content.style.display = 'none';
+                panel.style.maxHeight = '60px';
+                toggleBtn.textContent = '+';
+            }
+            isPanelCollapsed = !isPanelCollapsed;
+        }
+
+        // توابع کنترل نقشه
+        function zoomIn() {
+            map.zoomIn();
+        }
+
+        function zoomOut() {
+            map.zoomOut();
+        }
+
+        function centerMap() {
+            if (marker) {
+                map.setView(marker.getLatLng(), 15);
+            }
+        }
 
         // گوش دادن به تغییرات موقعیت
         database.ref('wifeLocation/').on('value', (snapshot) => {
@@ -121,33 +274,41 @@
             const latElement = document.getElementById('lat');
             const lngElement = document.getElementById('lng');
 
-            if (data && data.latitude) {
-                const lat = data.latitude;
-                const lng = data.longitude;
-                const time = new Date(data.timestamp).toLocaleString('fa-IR');
+            if (data && data.lat) {
+                const lat = data.lat;
+                const lng = data.lng;
+                const time = data.time || new Date().toLocaleString('fa-IR');
                 
                 // بروزرسانی اطلاعات
                 latElement.textContent = lat.toFixed(6);
                 lngElement.textContent = lng.toFixed(6);
                 timeElement.textContent = time;
                 
-                statusElement.textContent = 'آنلاین ✅';
-                statusElement.className = 'status online';
+                statusElement.textContent = 'آنلاین';
+                statusElement.className = 'status-badge online pulse';
 
                 // بروزرسانی نقشه
                 if (marker) {
                     marker.setLatLng([lat, lng]);
                 } else {
-                    marker = L.marker([lat, lng])
-                        .addTo(map)
-                        .bindPopup(`
+                    marker = L.marker([lat, lng], {
+                        icon: L.divIcon({
+                            className: 'custom-marker',
+                            html: '📍',
+                            iconSize: [30, 30],
+                            iconAnchor: [15, 30]
+                        })
+                    }).addTo(map)
+                    .bindPopup(`
+                        <div style="text-align: center;">
                             <strong>موقعیت همسر</strong><br>
-                            زمان: ${time}<br>
-                            <a href="https://maps.google.com/?q=${lat},${lng}" target="_blank">
-                                باز کردن در Google Maps
+                            <small>${time}</small><br>
+                            <a href="https://maps.google.com/?q=${lat},${lng}" target="_blank" 
+                               style="color: #667eea; text-decoration: none;">
+                               🗺️ باز کردن در Google Maps
                             </a>
-                        `)
-                        .openPopup();
+                        </div>
+                    `);
                 }
 
                 // دایره دقت موقعیت
@@ -155,37 +316,49 @@
                     circle.setLatLng([lat, lng]);
                 } else {
                     circle = L.circle([lat, lng], {
-                        color: 'red',
-                        fillColor: '#f03',
-                        fillOpacity: 0.2,
-                        radius: 50
+                        color: '#667eea',
+                        fillColor: '#667eea',
+                        fillOpacity: 0.1,
+                        radius: 100
                     }).addTo(map);
                 }
                 
+                // مرکزیت نقشه روی موقعیت جدید
                 map.setView([lat, lng], 15);
             } else {
-                statusElement.textContent = 'آفلاین ❌';
-                statusElement.className = 'status offline';
+                statusElement.textContent = 'آفلاین';
+                statusElement.className = 'status-badge offline';
                 timeElement.textContent = '-';
                 latElement.textContent = '-';
                 lngElement.textContent = '-';
+                
+                // حذف انیمیشن وقتی آفلاین است
+                statusElement.classList.remove('pulse');
             }
         });
 
-        // بروزرسانی خودکار هر 5 ثانیه (برای نمایش وضعیت)
+        // بروزرسانی خودکار وضعیت
         setInterval(() => {
             database.ref('wifeLocation/').once('value').then((snapshot) => {
                 if (!snapshot.exists()) {
-                    document.getElementById('status').textContent = 'آفلاین ❌';
-                    document.getElementById('status').className = 'status offline';
+                    document.getElementById('status').textContent = 'آفلاین';
+                    document.getElementById('status').className = 'status-badge offline';
+                    document.getElementById('status').classList.remove('pulse');
                 }
             });
         }, 5000);
 
-        // Service Worker برای PWA
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('/sw-receiver.js');
-        }
+        // جلوگیری از بسته شدن پنل با کلیک روی آن
+        document.getElementById('infoPanel').addEventListener('click', (e) => {
+            e.stopPropagation();
+        });
+
+        // بستن پنل با کلیک روی نقشه
+        map.on('click', () => {
+            if (!isPanelCollapsed) {
+                togglePanel();
+            }
+        });
     </script>
 </body>
 </html>
